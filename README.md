@@ -61,3 +61,88 @@ This redefines *who finance is for*, not just how it works.
 ---
 
 ## 🔄 Core Workflow
+User requests wallet
+→ Community members verify user
+→ Wallet is activated
+→ User performs transactions
+→ Reputation score increases over time
+
+
+---
+
+## 🧠 Why Blockchain?
+
+- Eliminates centralized control over identity  
+- Prevents tampering with reputation data  
+- Enables transparent, trustless verification  
+- Ensures fairness in financial inclusion  
+
+Blockchain is used **as infrastructure**, not as a buzzword.
+
+---
+
+## 🧪 MVP Scope
+
+### Included
+- Wallet creation (testnet)
+- Community verification logic
+- Reputation score calculation
+- Basic send/receive transactions
+- Dashboard to view wallet & reputation
+
+### Not Included
+- Real bank integration
+- Real-world KYC
+- Production payments
+- Live loan disbursement
+
+---
+
+## 🛠️ Tech Stack
+
+- **Blockchain:** Ethereum / Polygon (Testnet)  
+- **Smart Contracts:** Solidity  
+- **Backend:** Node.js, Express  
+- **Database:** MongoDB  
+- **Frontend:** React  
+- **Wallet Integration:** MetaMask  
+
+---
+
+## 📁 Project Structure
+
+Invisible-Wallets/
+│
+├── smart-contract/ # Solidity contracts
+├── backend/ # API & business logic
+├── frontend/ # User interface
+├── docs/ # Diagrams & documentation
+└── README.md
+
+
+---
+
+## 🌍 Impact
+
+Invisible Wallets enables:
+- Financial inclusion for the unbanked  
+- Ethical identity creation without surveillance  
+- Trust-driven economic participation  
+
+It proposes a future where **identity is earned, not issued**.
+
+---
+
+## 🚀 Future Enhancements
+
+- Micro-loans based on reputation
+- Offline QR-based payments
+- NGO / employer dashboards
+- Cross-community trust networks
+
+---
+
+## 👩‍💻 Team
+
+Built as part of an **Open Innovation** track to explore alternative models of financial identity and access.
+
