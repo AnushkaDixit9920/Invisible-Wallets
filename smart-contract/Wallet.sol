@@ -8,4 +8,6 @@ contract Wallet {
         uint256 reputation;
     }
 
+    mapping(address => User) public users;
+
 }
