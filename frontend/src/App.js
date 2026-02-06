@@ -4,6 +4,7 @@ import abi from "./abi.json";
 import walletBg from "./assets/wallet-bg.jpg"; 
 
 const contractAddress = "0xa9B82A271A5cc0A36b4a688B2642a71F73081594";
+const BACKEND_URL = "https://invisible-wallets-backend.onrender.com"; // change when deployed
 
 function App() {
   const [status, setStatus] = useState("");
@@ -11,7 +12,9 @@ function App() {
   const [reputation, setReputation] = useState(null);
   const [adminStatus, setAdminStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [walletAddress, setWalletAddress] = useState("");
 
+  // Switch MetaMask to Sepolia
   const switchToSepolia = async () => {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
@@ -19,6 +22,7 @@ function App() {
     });
   };
 
+  // Get contract instance
   const getContract = async () => {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
@@ -28,17 +32,38 @@ function App() {
     };
   };
 
+  // 🔗 Connect wallet + store user in backend
   const connectWallet = async () => {
     try {
       setStatus("Connecting wallet...");
       await switchToSepolia();
-      await window.ethereum.request({ method: "eth_requestAccounts" });
-      setStatus("Wallet connected on Sepolia ✅");
-    } catch {
+
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+
+      const address = accounts[0];
+      setWalletAddress(address);
+
+      // Save wallet to backend (off-chain profile)
+      await fetch(`${BACKEND_URL}/api/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress: address,
+          name: "Demo User",
+        }),
+      });
+
+      setStatus("Wallet connected & stored in backend ✅");
+    } catch (error) {
       setStatus("Wallet connection failed ❌");
     }
   };
 
+  // Create on-chain identity
   const createUser = async () => {
     try {
       setLoading(true);
@@ -53,6 +78,7 @@ function App() {
     setLoading(false);
   };
 
+  // Check verification + reputation
   const checkStatus = async () => {
     try {
       const { contract, signer } = await getContract();
@@ -65,6 +91,7 @@ function App() {
     }
   };
 
+  // Admin: verify user
   const verifyMe = async () => {
     try {
       setAdminStatus("Verifying user...");
@@ -78,6 +105,7 @@ function App() {
     }
   };
 
+  // Admin: increase reputation
   const increaseMyReputation = async () => {
     try {
       setAdminStatus("Increasing reputation...");
