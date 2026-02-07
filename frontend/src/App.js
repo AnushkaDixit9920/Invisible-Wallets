@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import abi from "./abi.json";
-import walletBg from "./assets/wallet-bg.jpg"; 
+import walletBg from "./assets/wallet-bg.jpg";
 
 const contractAddress = "0xa9B82A271A5cc0A36b4a688B2642a71F73081594";
-const BACKEND_URL = "https://invisible-wallets-backend.onrender.com"; // change when deployed
+const BACKEND_URL = "https://invisible-wallets-backend.onrender.com";
 
 function App() {
   const [status, setStatus] = useState("");
@@ -14,30 +14,36 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [walletAddress, setWalletAddress] = useState("");
 
-  // Switch MetaMask to Sepolia
-  const switchToSepolia = async () => {
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: "0xaa36a7" }],
-    });
-  };
+  /* ---------- AUTO-DETECT WALLET ---------- */
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.request({ method: "eth_accounts" }).then((accounts) => {
+        if (accounts.length > 0) {
+          setWalletAddress(accounts[0]);
+          setStatus("Wallet already connected ✅");
+        }
+      });
+    }
+  }, []);
 
-  // Get contract instance
+  /* ---------- CONTRACT ---------- */
   const getContract = async () => {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
-    return {
-      contract: new ethers.Contract(contractAddress, abi, signer),
-      signer,
-    };
+    return new ethers.Contract(contractAddress, abi, signer);
   };
 
-  // 🔗 Connect wallet + store user in backend
+  /* ---------- CONNECT WALLET ---------- */
   const connectWallet = async () => {
-    try {
-      setStatus("Connecting wallet...");
-      await switchToSepolia();
+    if (!window.ethereum) {
+      setStatus("MetaMask not detected ❌");
+      return;
+    }
 
+    try {
+      setStatus("Requesting wallet access...");
+
+      // 1️⃣ Request accounts (THIS triggers MetaMask popup)
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
@@ -45,30 +51,40 @@ function App() {
       const address = accounts[0];
       setWalletAddress(address);
 
-      // Save wallet to backend (off-chain profile)
+      // 2️⃣ Switch to Sepolia
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xaa36a7" }],
+        });
+      } catch {
+        setStatus("Please switch to Sepolia network ❌");
+        return;
+      }
+
+      // 3️⃣ Store wallet in backend
       await fetch(`${BACKEND_URL}/api/users`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           walletAddress: address,
           name: "Demo User",
         }),
       });
 
-      setStatus("Wallet connected & stored in backend ✅");
-    } catch (error) {
-      setStatus("Wallet connection failed ❌");
+      setStatus("Wallet connected successfully ✅");
+    } catch (err) {
+      setStatus("User rejected wallet connection ❌");
+      console.error(err);
     }
   };
 
-  // Create on-chain identity
+  /* ---------- CREATE USER ---------- */
   const createUser = async () => {
     try {
       setLoading(true);
-      setStatus("Creating wallet...");
-      const { contract } = await getContract();
+      setStatus("Creating on-chain identity...");
+      const contract = await getContract();
       const tx = await contract.createUser();
       await tx.wait();
       setStatus("Wallet created successfully 🎉");
@@ -78,11 +94,11 @@ function App() {
     setLoading(false);
   };
 
-  // Check verification + reputation
+  /* ---------- CHECK STATUS ---------- */
   const checkStatus = async () => {
     try {
-      const { contract, signer } = await getContract();
-      const addr = await signer.getAddress();
+      const contract = await getContract();
+      const addr = await contract.runner.getAddress();
       setVerified(await contract.isUserVerified(addr));
       setReputation((await contract.getReputation(addr)).toString());
       setStatus("User data fetched ✅");
@@ -91,12 +107,12 @@ function App() {
     }
   };
 
-  // Admin: verify user
+  /* ---------- ADMIN ACTIONS ---------- */
   const verifyMe = async () => {
     try {
       setAdminStatus("Verifying user...");
-      const { contract, signer } = await getContract();
-      const addr = await signer.getAddress();
+      const contract = await getContract();
+      const addr = await contract.runner.getAddress();
       const tx = await contract.verifyUser(addr);
       await tx.wait();
       setAdminStatus("User verified ✅");
@@ -105,12 +121,11 @@ function App() {
     }
   };
 
-  // Admin: increase reputation
   const increaseMyReputation = async () => {
     try {
       setAdminStatus("Increasing reputation...");
-      const { contract, signer } = await getContract();
-      const addr = await signer.getAddress();
+      const contract = await getContract();
+      const addr = await contract.runner.getAddress();
       const tx = await contract.increaseReputation(addr);
       await tx.wait();
       setAdminStatus("Reputation increased ⭐");
@@ -119,6 +134,7 @@ function App() {
     }
   };
 
+  /* ---------- UI ---------- */
   return (
     <div style={styles.page}>
       <div style={styles.card}>
@@ -129,17 +145,22 @@ function App() {
           <button style={styles.primaryBtn} onClick={connectWallet}>
             🔗 Connect Wallet
           </button>
+
           <button
             style={styles.primaryBtn}
             onClick={createUser}
-            disabled={loading}
+            disabled={loading || !walletAddress}
           >
             {loading ? "⏳ Processing..." : "➕ Create Wallet"}
           </button>
         </div>
 
         <div style={styles.section}>
-          <button style={styles.secondaryBtn} onClick={checkStatus}>
+          <button
+            style={styles.secondaryBtn}
+            onClick={checkStatus}
+            disabled={!walletAddress}
+          >
             📊 Check My Status
           </button>
 
@@ -156,11 +177,19 @@ function App() {
         </div>
 
         <div style={styles.section}>
-          <h3 style={{ marginBottom: "10px" }}>🔑 Admin Actions</h3>
-          <button style={styles.adminBtn} onClick={verifyMe}>
+          <h3>🔑 Admin Actions</h3>
+          <button
+            style={styles.adminBtn}
+            onClick={verifyMe}
+            disabled={!walletAddress}
+          >
             ✅ Verify User
           </button>
-          <button style={styles.adminBtn} onClick={increaseMyReputation}>
+          <button
+            style={styles.adminBtn}
+            onClick={increaseMyReputation}
+            disabled={!walletAddress}
+          >
             ⭐ Increase Reputation
           </button>
           {adminStatus && <p>{adminStatus}</p>}
@@ -182,7 +211,6 @@ const styles = {
     ), url(${walletBg})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -190,29 +218,16 @@ const styles = {
   },
   card: {
     background: "rgba(15, 23, 42, 0.92)",
-    backdropFilter: "blur(14px)",
     padding: "32px",
     width: "380px",
     borderRadius: "16px",
     boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
     textAlign: "center",
     color: "#e5e7eb",
-    border: "1px solid rgba(255,255,255,0.08)",
   },
-  title: {
-    marginBottom: "6px",
-    color: "#38bdf8",
-  },
-  subtitle: {
-    fontSize: "13px",
-    opacity: 0.7,
-    marginBottom: "22px",
-  },
-  section: {
-    marginBottom: "22px",
-    paddingBottom: "16px",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-  },
+  title: { color: "#38bdf8" },
+  subtitle: { fontSize: "13px", opacity: 0.7, marginBottom: "22px" },
+  section: { marginBottom: "20px" },
   primaryBtn: {
     width: "100%",
     padding: "14px",
@@ -221,17 +236,16 @@ const styles = {
     color: "#fff",
     border: "none",
     borderRadius: "10px",
-    cursor: "pointer",
-    fontSize: "15px",
     fontWeight: "600",
+    cursor: "pointer",
   },
   secondaryBtn: {
     width: "100%",
     padding: "12px",
     background: "#020617",
     color: "#e5e7eb",
-    border: "1px solid rgba(255,255,255,0.15)",
     borderRadius: "10px",
+    border: "1px solid rgba(255,255,255,0.15)",
     cursor: "pointer",
   },
   adminBtn: {
@@ -242,14 +256,9 @@ const styles = {
     color: "#022c22",
     border: "none",
     borderRadius: "10px",
-    cursor: "pointer",
     fontWeight: "600",
   },
-  status: {
-    marginTop: "18px",
-    fontWeight: "600",
-    color: "#38bdf8",
-  },
+  status: { marginTop: "14px", fontWeight: "600", color: "#38bdf8" },
   yes: { color: "#22c55e", fontWeight: "bold" },
   no: { color: "#ef4444", fontWeight: "bold" },
 };
